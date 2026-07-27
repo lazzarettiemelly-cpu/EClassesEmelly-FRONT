@@ -1,14 +1,18 @@
 // BASE_URL aponta para o JSON local enquanto a API não está integrada.
 // Quando a API estiver pronta, basta trocar para: 'http://localhost:3000/api'
-const BASE_URL = './data.json';
+const BASE_URL = 'http://localhost:3000/api/';
 
 // Função interna que simula um GET na "API"
-async function _get(endpoint) {
-    const response = await fetch(BASE_URL);
-
-    if (!response.ok) {
-        throw new Error(`Erro ao buscar ${endpoint}: status ${response.status}`);
-    }
+async function getData (endpoint) {
+    try{
+        const response = await fetch(`${BASE_URL}${endpoint}`);
+        if (!response.ok) {
+            throw new Error(`Erro de link: ${response.statusText}`);
+        }
+        console.log(response);
+        const data = await response.json()
+        return data;
+    }catch(error){
 
     const data = await response.json();
 
