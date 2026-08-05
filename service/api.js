@@ -13,6 +13,7 @@ async function getData (endpoint) {
         const data = await response.json()
         return data;
     }catch(error){
+    }
 
     const data = await response.json();
 
