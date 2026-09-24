@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     await carregarDados();
     configurarNavegacao();
     renderizarTudo();
+
+    iniciarFogos();
+
+    // 🎆 Solta fogos ao abrir o site
+    setTimeout(() => {
+        lancarFogos();
+    }, 800);
 });
 
 // Busca todos os dados via service
@@ -57,6 +64,233 @@ function renderizarTudo() {
     renderizarTimes();
     renderizarCompetidores();
     renderizarConfrontos();
+    renderizarElementoInteligente();
+}
+
+// --- Elemento inteligente: Próximo confronto ---
+
+function renderizarElementoInteligente() {
+    const container = document.getElementById('smart-element');
+
+    if (!container) return;
+
+    const agora = new Date();
+
+    const proximos = state.confrontos
+        .filter(c => c.status === 'scheduled')
+        .map(c => ({
+            ...c,
+            dataJogo: new Date(c.date)
+        }))
+        .filter(c => c.dataJogo >= agora)
+        .sort((a, b) => a.dataJogo - b.dataJogo);
+
+    // Se não houver nenhum confronto
+    if (proximos.length === 0) {
+
+        container.innerHTML = `
+            <div class="smart-card smart-empty">
+
+                <div class="smart-empty-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+
+                <div>
+                    <span class="smart-label">
+                        CENTRAL DA ARENA
+                    </span>
+
+                    <h2>
+                        Nenhum confronto agendado
+                    </h2>
+
+                    <p>
+                        Quando um novo confronto for registrado,
+                        ele aparecerá aqui automaticamente.
+                    </p>
+                </div>
+
+            </div>
+        `;
+
+        return;
+    }
+
+    // Pega automaticamente o próximo confronto
+    const confronto = proximos[0];
+
+    const jogo = state.jogos.find(
+        j => j.id == confronto.gameId
+    );
+
+    const time1 = state.times.find(
+        t => t.id == confronto.team1Id
+    );
+
+    const time2 = state.times.find(
+        t => t.id == confronto.team2Id
+    );
+
+    const dataFormatada =
+        confronto.dataJogo.toLocaleDateString('pt-BR', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long'
+        });
+
+    const horaFormatada =
+        confronto.dataJogo.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+    container.innerHTML = `
+
+        <div class="smart-card">
+
+            <div class="smart-top">
+
+                <div>
+
+                    <span class="smart-label">
+                        <i class="fas fa-bolt"></i>
+                        PRÓXIMO CONFRONTO
+                    </span>
+
+                    <h2>
+                        ${jogo?.name || 'Jogo'}
+                    </h2>
+
+                    <p>
+                        ${dataFormatada} às ${horaFormatada}
+                    </p>
+
+                </div>
+
+                <div class="smart-status">
+                    AGENDADO
+                </div>
+
+            </div>
+
+
+            <div class="smart-match">
+
+                <div class="smart-team">
+
+                    <div
+                        class="smart-team-color"
+                        style="background:${time1?.color || '#6366f1'}">
+                    </div>
+
+                    <strong>
+                        ${time1?.name || 'TBD'}
+                    </strong>
+
+                </div>
+
+
+                <div class="smart-vs">
+
+                    <span>VS</span>
+
+                </div>
+
+
+                <div class="smart-team">
+
+                    <div
+                        class="smart-team-color"
+                        style="background:${time2?.color || '#6366f1'}">
+                    </div>
+
+                    <strong>
+                        ${time2?.name || 'TBD'}
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="smart-countdown">
+
+                <span id="smart-countdown">
+                    --:--:--
+                </span>
+
+                <small>
+                    tempo restante
+                </small>
+
+            </div>
+
+        </div>
+    `;
+
+    iniciarContagem(confronto.dataJogo);
+}
+
+let intervaloContagem;
+
+function iniciarContagem(dataJogo) {
+
+    clearInterval(intervaloContagem);
+
+    const elemento =
+        document.getElementById('smart-countdown');
+
+    if (!elemento) return;
+
+    function atualizar() {
+
+        const agora = new Date();
+
+        const diferenca =
+            dataJogo - agora;
+
+        // Quando chegar a hora
+        if (diferenca <= 0) {
+
+            elemento.textContent = 'AO VIVO';
+
+            const status =
+                document.querySelector('.smart-status');
+
+            if (status) {
+                status.textContent = '🔴 AO VIVO';
+                status.classList.add('live');
+            }
+
+            clearInterval(intervaloContagem);
+
+            return;
+        }
+
+        const horas = Math.floor(
+            diferenca / (1000 * 60 * 60)
+        );
+
+        const minutos = Math.floor(
+            (diferenca % (1000 * 60 * 60))
+            / (1000 * 60)
+        );
+
+        const segundos = Math.floor(
+            (diferenca % (1000 * 60))
+            / 1000
+        );
+
+        elemento.textContent =
+            `${String(horas).padStart(2, '0')}:` +
+            `${String(minutos).padStart(2, '0')}:` +
+            `${String(segundos).padStart(2, '0')}`;
+    }
+
+    atualizar();
+
+    intervaloContagem =
+        setInterval(atualizar, 1000);
 }
 
 // --- Funções de renderização ---
@@ -326,6 +560,145 @@ window.encerrarConfrontos = function (id) {
         confronto.score1 = Number(placar1);
         confronto.score2 = Number(placar2);
         confronto.status = 'finished';
+
         renderizarTudo();
     }
 };
+
+/* =========================================
+   FOGOS DE ARTIFÍCIO DA ARENA
+========================================= */
+
+let canvas;
+let ctx;
+let particles = [];
+
+function iniciarFogos() {
+    canvas = document.getElementById('fireworks');
+
+    if (!canvas) {
+        console.warn('Canvas dos fogos não encontrado.');
+        return;
+    }
+
+    ctx = canvas.getContext('2d');
+
+    ajustarCanvas();
+
+    window.addEventListener('resize', ajustarCanvas);
+
+    animarFogos();
+}
+
+function ajustarCanvas() {
+    if (!canvas) return;
+
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+}
+
+function criarExplosao(x, y) {
+
+    const quantidade = 70;
+
+    const cores = [
+        '#6366f1',
+        '#06b6d4',
+        '#f43f5e',
+        '#facc15',
+        '#22c55e',
+        '#ffffff'
+    ];
+
+    for (let i = 0; i < quantidade; i++) {
+
+        const angulo = Math.random() * Math.PI * 2;
+        const velocidade = Math.random() * 5 + 2;
+
+        particles.push({
+            x: x,
+            y: y,
+
+            vx: Math.cos(angulo) * velocidade,
+            vy: Math.sin(angulo) * velocidade,
+
+            vida: 1,
+
+            tamanho: Math.random() * 3 + 1,
+
+            cor: cores[
+                Math.floor(Math.random() * cores.length)
+            ]
+        });
+    }
+}
+
+function animarFogos() {
+
+    if (!canvas || !ctx) return;
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+
+        const p = particles[i];
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        p.vy += 0.04;
+
+        p.vida -= 0.015;
+
+        ctx.globalAlpha = Math.max(p.vida, 0);
+
+        ctx.beginPath();
+
+        ctx.arc(
+            p.x,
+            p.y,
+            p.tamanho,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = p.cor;
+
+        ctx.fill();
+
+        if (p.vida <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+
+    ctx.globalAlpha = 1;
+
+    requestAnimationFrame(animarFogos);
+}
+
+function lancarFogos() {
+
+    if (!canvas) return;
+
+    const quantidade = 5;
+
+    for (let i = 0; i < quantidade; i++) {
+
+        setTimeout(() => {
+
+            const x =
+                Math.random() * canvas.width;
+
+            const y =
+                Math.random() * (canvas.height * 0.55);
+
+            criarExplosao(x, y);
+
+        }, i * 450);
+    }
+}
